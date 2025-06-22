@@ -1,0 +1,47 @@
+plugins {
+    id 'java'
+    id 'application'
+    id 'org.flywaydb.flyway' version '9.22.3' // Para migraciones (opcional)
+
+}
+
+group = 'org.devquality'
+version = '1.0-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    testImplementation platform('org.junit:junit-bom:5.10.0')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    implementation("io.javalin:javalin:6.6.0")
+    implementation 'org.slf4j:slf4j-simple:2.0.7'
+
+    // 📄 JSON Processing (Jackson)
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.15.2'
+    implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.15.2'
+    implementation 'com.fasterxml.jackson.module:jackson-module-parameter-names:2.15.2'
+
+    // 🐘 PostgreSQL
+    implementation 'org.postgresql:postgresql:42.7.2'
+
+    // 🏊‍♂️ HikariCP - Pool de conexiones
+    implementation 'com.zaxxer:HikariCP:5.0.1'
+
+    // 🔄 Migraciones de BD (opcional pero recomendado)
+    implementation 'org.flywaydb:flyway-core:9.22.3'
+    implementation 'org.flywaydb:flyway-database-postgresql:9.22.3'
+
+    // ✅ Validación (opcional)
+    implementation 'org.hibernate.validator:hibernate-validator:8.0.1.Final'
+    implementation 'org.glassfish:jakarta.el:4.0.2'
+
+    // 🔐 JWT para autenticación (opcional)
+    implementation 'com.auth0:java-jwt:4.4.0'
+
+}
+
+test {
+    useJUnitPlatform()
+}
