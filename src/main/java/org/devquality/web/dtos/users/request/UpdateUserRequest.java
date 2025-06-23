@@ -8,33 +8,33 @@ import jakarta.validation.constraints.*;
 
 @Getter
 @Setter
-public class CreaterUserRequest {
+public class UpdateUserRequest {
 
-    @NotNull(message = "El nombre es obligatorio", groups = ValidationGroups.Basic.class)
-    @NotBlank(message = "El nombre no puede estar vacío", groups = ValidationGroups.Basic.class)
+    @NotNull(message = "El ID es obligatorio", groups = ValidationGroups.Update.class)
+    @Positive(message = "El ID debe ser positivo", groups = ValidationGroups.Update.class)
+    private Long id;
+
     @Size(
             min = 2,
             max = 255,
             message = "El nombre debe tener entre 2 y 255 caracteres",
-            groups = ValidationGroups.Create.class
+            groups = ValidationGroups.Update.class
     )
     @Pattern(
             regexp = "^[a-zA-ZÀ-ÿ\\u00f1\\u00d1\\s'-]+$",
             message = "El nombre solo puede contener letras, espacios, guiones y apostrofes",
-            groups = ValidationGroups.Create.class
+            groups = ValidationGroups.Update.class
     )
     private String name;
 
-    @NotNull(message = "El email es obligatorio", groups = ValidationGroups.Basic.class)
-    @NotBlank(message = "El email no puede estar vacío", groups = ValidationGroups.Basic.class)
     @Email(
             message = "El email debe tener un formato válido",
-            groups = ValidationGroups.Create.class
+            groups = ValidationGroups.Update.class
     )
     @Size(
             max = 255,
             message = "El email no puede exceder 255 caracteres",
-            groups = ValidationGroups.Create.class
+            groups = ValidationGroups.Update.class
     )
     private String email;
 }

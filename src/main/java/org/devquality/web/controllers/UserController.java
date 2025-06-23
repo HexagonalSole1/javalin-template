@@ -3,14 +3,21 @@ package org.devquality.web.controllers;
 import io.javalin.http.Context;
 import io.javalin.http.HttpStatus;
 import org.devquality.services.IUserService;
+import org.devquality.web.dtos.core.response.BaseResponse;
+import org.devquality.web.dtos.core.response.ResponseMetadata;
 import org.devquality.web.dtos.users.request.CreaterUserRequest;
-import org.devquality.web.dtos.users.response.CreateUserResponse;
+import org.devquality.web.middleware.BeanValidationMiddleware;
+import org.devquality.web.validators.groups.ValidationGroups;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.SQLException;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.Collections;
+
+/**
+ * 🎯 Controller ULTRA LIMPIO - Solo lógica de negocio
+ * Toda la validación está en BeanValidationMiddleware
+ */
 
 public class UserController {
     private static final Logger logger = LoggerFactory.getLogger(UserController.class);
@@ -21,187 +28,104 @@ public class UserController {
     }
 
     /**
-     * GET /api/users - Obtener todos los usuarios
-     */
-    public void getAllUsers(Context ctx) {
-        try {
-            logger.info("📋 Obteniendo todos los usuarios");
-
-            // Obtener usuarios desde el service
-            var users = userService.getAllUsers();
-
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", true);
-            response.put("message", "Usuarios obtenidos correctamente");
-            response.put("data", users);
-            response.put("count", users.size());
-
-            ctx.status(HttpStatus.OK).json(response);
-            logger.info("✅ {} usuarios obtenidos correctamente", users.size());
-
-        } catch (Exception e) {
-            logger.error("❌ Error al obtener usuarios: {}", e.getMessage());
-            handleError(ctx, "Error al obtener usuarios", e);
-        }
-    }
-
-    /**
-     * POST /api/users - Crear un nuevo usuario
+     * ✅ POST /api/users - Crear nuevo usuario (ULTRA LIMPIO)
      */
     public void createUser(Context ctx) {
+        // ✨ 1 LÍNEA: Validación automática completa
+        CreaterUserRequest request = BeanValidationMiddleware.validateRequest(
+                ctx,
+                CreaterUserRequest.class,
+                ValidationGroups.Create.class
+        );
+
+        // ✨ 1 LÍNEA: Si hay errores, ya respondió automáticamente
+        if (request == null) return;
+
         try {
-            logger.info("🆕 Creando nuevo usuario");
+            // ✨ SOLO LÓGICA DE NEGOCIO
+            var userResponse = userService.user(request);
 
-            // Validar content-type
-            String contentType = ctx.header("Content-Type");
-            if (contentType == null || !contentType.contains("application/json")) {
-                ctx.status(HttpStatus.BAD_REQUEST).json(Map.of(
-                        "success", false,
-                        "message", "Content-Type debe ser application/json"
-                ));
-                return;
-            }
-
-            // Deserializar request
-            CreaterUserRequest request = ctx.bodyAsClass(CreaterUserRequest.class);
-
-            // Validaciones básicas
-            if (request.getName() == null || request.getName().trim().isEmpty()) {
-                ctx.status(HttpStatus.BAD_REQUEST).json(Map.of(
-                        "success", false,
-                        "message", "El nombre es obligatorio"
-                ));
-                return;
-            }
-
-            if (request.getEmail() == null || request.getEmail().trim().isEmpty()) {
-                ctx.status(HttpStatus.BAD_REQUEST).json(Map.of(
-                        "success", false,
-                        "message", "El email es obligatorio"
-                ));
-                return;
-            }
-
-            // Validación de formato de email básica
-            if (!request.getEmail().contains("@")) {
-                ctx.status(HttpStatus.BAD_REQUEST).json(Map.of(
-                        "success", false,
-                        "message", "El email debe tener un formato válido"
-                ));
-                return;
-            }
-
-            // Crear usuario a través del service
-            CreateUserResponse userResponse = userService.user(request);
-
-            // Respuesta exitosa
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", true);
-            response.put("message", "Usuario creado correctamente");
-            response.put("data", userResponse);
-
-            ctx.status(HttpStatus.CREATED).json(response);
-            logger.info("✅ Usuario creado: {}", userResponse.getEmail());
+            // ✨ RESPUESTA DIRECTA
+            ctx.status(HttpStatus.CREATED).json(
+                    BaseResponse.success(userResponse, "Usuario creado correctamente")
+            );
 
         } catch (SQLException e) {
-            logger.error("❌ Error de base de datos al crear usuario: {}", e.getMessage());
-
-            // Manejar errores específicos de base de datos
-            if (e.getMessage().contains("duplicate key") || e.getMessage().contains("unique constraint")) {
-                ctx.status(HttpStatus.CONFLICT).json(Map.of(
-                        "success", false,
-                        "message", "Ya existe un usuario con ese email"
-                ));
-            } else {
-                handleError(ctx, "Error de base de datos al crear usuario", e);
-            }
-
+            // ✨ 1 LÍNEA: Manejo automático de errores de BD
+            BeanValidationMiddleware.handleDatabaseError(ctx, e);
         } catch (Exception e) {
-            logger.error("❌ Error inesperado al crear usuario: {}", e.getMessage());
-            handleError(ctx, "Error al crear usuario", e);
+            // ✨ 1 LÍNEA: Manejo automático de cualquier error
+            BeanValidationMiddleware.handleError(ctx, "Error al crear usuario", e);
         }
     }
 
     /**
-     * GET /api/users/{id} - Obtener usuario por ID
+     * ✅ GET /api/users/{id} - Obtener usuario por ID (ULTRA LIMPIO)
      */
     public void getUserById(Context ctx) {
+        // ✨ 1 LÍNEA: Validación automática de ID
+        Long userId = BeanValidationMiddleware.validateId(ctx, "id");
+        if (userId == null) return;
+
         try {
-            String idParam = ctx.pathParam("id");
-            logger.info("🔍 Obteniendo usuario con ID: {}", idParam);
-
-            // Validar que el ID sea un número
-            Long userId;
-            try {
-                userId = Long.parseLong(idParam);
-            } catch (NumberFormatException e) {
-                ctx.status(HttpStatus.BAD_REQUEST).json(Map.of(
-                        "success", false,
-                        "message", "El ID debe ser un número válido"
-                ));
-                return;
-            }
-
-            // Obtener usuario desde el service
+            // ✨ SOLO LÓGICA DE NEGOCIO
             var user = userService.getUserById(userId);
 
             if (user == null) {
-                ctx.status(HttpStatus.NOT_FOUND).json(Map.of(
-                        "success", false,
-                        "message", "Usuario no encontrado",
-                        "id", userId
-                ));
+                ctx.status(HttpStatus.NOT_FOUND).json(
+                        BaseResponse.error("Usuario no encontrado")
+                );
                 return;
             }
 
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", true);
-            response.put("message", "Usuario encontrado");
-            response.put("data", user);
+            // ✨ RESPUESTA DIRECTA
+            ctx.status(HttpStatus.OK).json(
+                    BaseResponse.success(user, "Usuario encontrado")
+            );
 
-            ctx.status(HttpStatus.OK).json(response);
-            logger.info("✅ Usuario {} consultado: {}", userId, user.getEmail());
-
-        } catch (IllegalArgumentException e) {
-            logger.warn("⚠️ Argumento inválido: {}", e.getMessage());
-            ctx.status(HttpStatus.BAD_REQUEST).json(Map.of(
-                    "success", false,
-                    "message", e.getMessage()
-            ));
         } catch (Exception e) {
-            logger.error("❌ Error al obtener usuario: {}", e.getMessage());
-            handleError(ctx, "Error al obtener usuario", e);
+            // ✨ 1 LÍNEA: Manejo automático de errores
+            BeanValidationMiddleware.handleError(ctx, "Error al obtener usuario", e);
         }
     }
 
     /**
-     * GET /api/health - Health check
+     * ✅ GET /api/users - Obtener todos los usuarios (ULTRA LIMPIO)
+     */
+    public void getAllUsers(Context ctx) {
+        try {
+            // ✨ SOLO LÓGICA DE NEGOCIO
+            var users = userService.getAllUsers();
+
+            // ✨ METADATA OPCIONAL
+            ResponseMetadata metadata = ResponseMetadata.builder()
+                    .type("USER_LIST")
+                    .totalElements((long) users.size())
+                    .build();
+
+            // ✨ RESPUESTA DIRECTA
+            ctx.status(HttpStatus.OK).json(
+                    BaseResponse.success(users, "Usuarios obtenidos correctamente", metadata)
+            );
+
+        } catch (Exception e) {
+            // ✨ 1 LÍNEA: Manejo automático de errores
+            BeanValidationMiddleware.handleError(ctx, "Error al obtener usuarios", e);
+        }
+    }
+
+    /**
+     * ✅ GET /api/health - Health check (ULTRA LIMPIO)
      */
     public void healthCheck(Context ctx) {
-        Map<String, Object> health = new HashMap<>();
-        health.put("status", "UP");
-        health.put("service", "UserService");
-        health.put("timestamp", System.currentTimeMillis());
+        var healthData = java.util.Map.of(
+                "status", "UP",
+                "service", "UserService",
+                "version", "1.0.0"
+        );
 
-        ctx.status(HttpStatus.OK).json(health);
-        logger.debug("🏥 Health check realizado");
-    }
-
-    /**
-     * Manejo centralizado de errores
-     */
-    private void handleError(Context ctx, String message, Exception e) {
-        Map<String, Object> errorResponse = new HashMap<>();
-        errorResponse.put("success", false);
-        errorResponse.put("message", message);
-        errorResponse.put("timestamp", System.currentTimeMillis());
-
-        // En desarrollo, incluir detalles del error
-        String env = System.getenv().getOrDefault("ENV", "development");
-        if ("development".equals(env)) {
-            errorResponse.put("error", e.getMessage());
-        }
-
-        ctx.status(HttpStatus.INTERNAL_SERVER_ERROR).json(errorResponse);
+        ctx.status(HttpStatus.OK).json(
+                BaseResponse.success(healthData, "Servicio funcionando correctamente")
+        );
     }
 }
