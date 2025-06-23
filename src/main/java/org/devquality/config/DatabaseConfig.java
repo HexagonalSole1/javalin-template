@@ -1,4 +1,5 @@
 package org.devquality.config;
+
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import org.slf4j.Logger;
@@ -16,7 +17,6 @@ public class DatabaseConfig {
 
     private DatabaseConfig() {
         setupDataSource();
-        createTables();
         logger.info("✅ Conexión a PostgreSQL establecida correctamente");
     }
 
@@ -33,9 +33,9 @@ public class DatabaseConfig {
         // 🏗️ Configuración de PostgreSQL
         String host = getEnvOrDefault("DB_HOST", "localhost");
         String port = getEnvOrDefault("DB_PORT", "5432");
-        String database = getEnvOrDefault("DB_NAME", "javalin_api");
-        String username = getEnvOrDefault("DB_USER", "postgres");
-        String password = getEnvOrDefault("DB_PASSWORD", "password");
+        String database = getEnvOrDefault("DB_NAME", "users");
+        String username = getEnvOrDefault("DB_USER", "Hexagonal");
+        String password = getEnvOrDefault("DB_PASSWORD", "HexagonalSole89");
 
         // URL de conexión
         String jdbcUrl = String.format("jdbc:postgresql://%s:%s/%s", host, port, database);
@@ -45,19 +45,19 @@ public class DatabaseConfig {
         config.setDriverClassName("org.postgresql.Driver");
 
         // 🚀 Configuración del Pool HikariCP (Optimizada para PostgreSQL)
-        config.setMaximumPoolSize(20);              // Máximo 20 conexiones
-        config.setMinimumIdle(5);                   // Mínimo 5 conexiones activas
-        config.setConnectionTimeout(30000);         // 30 segundos para obtener conexión
-        config.setIdleTimeout(600000);              // 10 minutos idle antes de cerrar
-        config.setMaxLifetime(1800000);             // 30 minutos vida máxima de conexión
-        config.setLeakDetectionThreshold(60000);    // Detectar leaks después de 1 minuto
+        config.setMaximumPoolSize(20);
+        config.setMinimumIdle(5);
+        config.setConnectionTimeout(30000);
+        config.setIdleTimeout(600000);
+        config.setMaxLifetime(1800000);
+        config.setLeakDetectionThreshold(60000);
 
         // 🔧 Configuraciones específicas de PostgreSQL
         Properties props = new Properties();
         props.setProperty("currentSchema", "public");
         props.setProperty("ApplicationName", "JavalinAPI");
         props.setProperty("stringtype", "unspecified");
-        props.setProperty("prepareThreshold", "0");  // Usar prepared statements inmediatamente
+        props.setProperty("prepareThreshold", "0");
         props.setProperty("defaultRowFetchSize", "1000");
         props.setProperty("loginTimeout", "10");
         props.setProperty("connectTimeout", "10");
@@ -69,8 +69,6 @@ public class DatabaseConfig {
         config.setPoolName("JavalinAPI-HikariCP");
         config.setConnectionTestQuery("SELECT 1");
         config.setValidationTimeout(5000);
-
-        // 🏷️ JMX para monitoreo (opcional)
         config.setRegisterMbeans(true);
 
         try {
@@ -95,90 +93,11 @@ public class DatabaseConfig {
         return dataSource.getConnection();
     }
 
-    private void createTables() {
-        String createUsersTable = """
-            CREATE TABLE IF NOT EXISTS users (
-                id BIGSERIAL PRIMARY KEY,
-                name VARCHAR(255) NOT NULL,
-                email VARCHAR(255) NOT NULL UNIQUE,
-                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-            )
-        """;
-
-        String createUsersEmailIndex = """
-            CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)
-        """;
-
-        String createProductsTable = """
-            CREATE TABLE IF NOT EXISTS products (
-                id BIGSERIAL PRIMARY KEY,
-                name VARCHAR(255) NOT NULL,
-                price DECIMAL(10,2) NOT NULL CHECK (price >= 0),
-                description TEXT,
-                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-            )
-        """;
-
-        String createProductsNameIndex = """
-            CREATE INDEX IF NOT EXISTS idx_products_name ON products(name)
-        """;
-
-        // Trigger para updated_at automático
-        String createUpdatedAtFunction = """
-            CREATE OR REPLACE FUNCTION update_updated_at_column()
-            RETURNS TRIGGER AS $$
-            BEGIN
-                NEW.updated_at = CURRENT_TIMESTAMP;
-                RETURN NEW;
-            END;
-            $$ language 'plpgsql'
-        """;
-
-        String createUsersUpdatedAtTrigger = """
-            DROP TRIGGER IF EXISTS update_users_updated_at ON users;
-            CREATE TRIGGER update_users_updated_at
-                BEFORE UPDATE ON users
-                FOR EACH ROW
-                EXECUTE FUNCTION update_updated_at_column()
-        """;
-
-        String createProductsUpdatedAtTrigger = """
-            DROP TRIGGER IF EXISTS update_products_updated_at ON products;
-            CREATE TRIGGER update_products_updated_at
-                BEFORE UPDATE ON products
-                FOR EACH ROW
-                EXECUTE FUNCTION update_updated_at_column()
-        """;
-
-        try (Connection conn = getConnection();
-             Statement stmt = conn.createStatement()) {
-
-            logger.info("📋 Creando tablas en PostgreSQL...");
-
-            // Crear tablas
-            stmt.execute(createUsersTable);
-            stmt.execute(createUsersEmailIndex);
-            stmt.execute(createProductsTable);
-            stmt.execute(createProductsNameIndex);
-
-            // Crear función y triggers para updated_at
-            stmt.execute(createUpdatedAtFunction);
-            stmt.execute(createUsersUpdatedAtTrigger);
-            stmt.execute(createProductsUpdatedAtTrigger);
-
-            logger.info("✅ Tablas creadas correctamente");
-
-        } catch (SQLException e) {
-            logger.error("❌ Error al crear tablas", e);
-            throw new RuntimeException("Error al crear tablas en PostgreSQL", e);
-        }
+    // ✅ Getter para Flyway
+    public HikariDataSource getDataSource() {
+        return dataSource;
     }
 
-    /**
-     * Obtiene información del estado del pool de conexiones
-     */
     public String getPoolStats() {
         if (dataSource != null) {
             return String.format(
@@ -192,9 +111,6 @@ public class DatabaseConfig {
         return "Pool no disponible";
     }
 
-    /**
-     * Verifica si la conexión a la base de datos está disponible
-     */
     public boolean isHealthy() {
         try (Connection conn = getConnection();
              Statement stmt = conn.createStatement()) {
@@ -206,9 +122,6 @@ public class DatabaseConfig {
         }
     }
 
-    /**
-     * Cierra el pool de conexiones
-     */
     public void close() {
         if (dataSource != null && !dataSource.isClosed()) {
             logger.info("🔒 Cerrando pool de conexiones...");
@@ -217,9 +130,6 @@ public class DatabaseConfig {
         }
     }
 
-    /**
-     * Obtiene variable de entorno o valor por defecto
-     */
     private String getEnvOrDefault(String envVar, String defaultValue) {
         String value = System.getenv(envVar);
         if (value == null || value.trim().isEmpty()) {

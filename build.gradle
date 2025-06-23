@@ -2,7 +2,6 @@ plugins {
     id 'java'
     id 'application'
     id 'org.flywaydb.flyway' version '9.22.3' // Para migraciones (opcional)
-
 }
 
 group = 'org.devquality'
@@ -29,9 +28,8 @@ dependencies {
     // 🏊‍♂️ HikariCP - Pool de conexiones
     implementation 'com.zaxxer:HikariCP:5.0.1'
 
-    // 🔄 Migraciones de BD (opcional pero recomendado)
+    // 🔄 Migraciones de BD (solo flyway-core es suficiente para PostgreSQL)
     implementation 'org.flywaydb:flyway-core:9.22.3'
-    implementation 'org.flywaydb:flyway-database-postgresql:9.22.3'
 
     // ✅ Validación (opcional)
     implementation 'org.hibernate.validator:hibernate-validator:8.0.1.Final'
@@ -39,7 +37,6 @@ dependencies {
 
     // 🔐 JWT para autenticación (opcional)
     implementation 'com.auth0:java-jwt:4.4.0'
-
 }
 
 test {
