@@ -8,6 +8,6 @@ import java.sql.SQLException;
 import java.util.List;
 
 public interface IUserService {
-    CreateUserResponse user(CreaterUserRequest user) throws SQLException;
+    CreateUserResponse createUser(CreaterUserRequest user) throws SQLException;
     List<User> getAllUsers() throws SQLException;
     User getUserById(Long id) throws SQLException;}

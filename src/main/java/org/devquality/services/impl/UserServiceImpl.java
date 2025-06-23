@@ -21,7 +21,7 @@ public class UserServiceImpl implements IUserService {
     }
 
     @Override
-    public CreateUserResponse user(CreaterUserRequest user) throws SQLException {
+    public CreateUserResponse createUser(CreaterUserRequest user) throws SQLException {
         logger.debug("📝 Procesando creación de usuario: {}", user.getEmail());
 
         // Validación adicional a nivel de servicio
