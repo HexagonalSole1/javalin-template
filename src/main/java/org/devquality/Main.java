@@ -75,22 +75,38 @@ public class Main {
             Flyway flyway = Flyway.configure()
                     .dataSource(dbConfig.getDataSource())
                     .locations("classpath:db/migration")
-                    .baselineOnMigrate(true)
+                    .cleanDisabled(false) // Permitir clean para desarrollo
+                    .baselineOnMigrate(false) // ❌ DESACTIVAR baseline
                     .validateOnMigrate(true)
                     .load();
 
-            // Información de migraciones
-            var info = flyway.info();
-            logger.info("📋 Estado de migraciones:");
-            for (var migration : info.all()) {
+            // 🧹 LIMPIEZA COMPLETA (solo para desarrollo)
+            logger.info("🧹 Limpiando base de datos completamente...");
+            flyway.clean();
+
+            // 📋 Verificar estado después de clean
+            var infoAfterClean = flyway.info();
+            logger.info("📋 Estado después de clean:");
+            for (var migration : infoAfterClean.all()) {
                 logger.info("  {} - {} ({})",
                         migration.getVersion(),
                         migration.getDescription(),
                         migration.getState());
             }
 
-            // Ejecutar migraciones
+            // 🚀 Ejecutar migraciones desde cero
+            logger.info("🚀 Ejecutando todas las migraciones desde la V1...");
             var result = flyway.migrate();
+
+            // 📊 Estado final
+            var finalInfo = flyway.info();
+            logger.info("📋 Estado final de migraciones:");
+            for (var migration : finalInfo.all()) {
+                logger.info("  {} - {} ({})",
+                        migration.getVersion(),
+                        migration.getDescription(),
+                        migration.getState());
+            }
 
             if (result.migrationsExecuted > 0) {
                 logger.info("✅ {} migraciones ejecutadas correctamente", result.migrationsExecuted);

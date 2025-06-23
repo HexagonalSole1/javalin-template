@@ -37,8 +37,19 @@ dependencies {
 
     // 🔐 JWT para autenticación (opcional)
     implementation 'com.auth0:java-jwt:4.4.0'
+
+    // Lombok
+    compileOnly 'org.projectlombok:lombok:1.18.30'
+    annotationProcessor 'org.projectlombok:lombok:1.18.30'
+
 }
 
 test {
     useJUnitPlatform()
+}
+configurations {
+    developmentOnly
+    runtimeClasspath {
+        extendsFrom developmentOnly
+    }
 }
