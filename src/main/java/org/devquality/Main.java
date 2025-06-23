@@ -1,13 +1,8 @@
 package org.devquality;
+
 import io.javalin.Javalin;
-
-
-import io.javalin.json.JavalinJackson;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import io.javalin.plugin.bundled.CorsPluginConfig;
-import org.devquality.config.DatabaseConfig;
-import org.flywaydb.core.Flyway;
+import org.devquality.config.*;
+import org.devquality.routes.Routes;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -18,49 +13,45 @@ public class Main {
         logger.info("🚀 Iniciando aplicación...");
 
         try {
-            // 1. Inicializar configuración de base de datos
+            // 0️⃣ Cargar configuración centralizada
+            logger.info("0️⃣ Cargando configuración...");
+            AppConfiguration appConfig = AppConfiguration.getInstance();
+
+            // Validar configuración antes de continuar
+            if (!appConfig.validateConfiguration()) {
+                logger.error("❌ Configuración inválida, abortando inicio");
+                System.exit(1);
+            }
+
+            // 1️⃣ Inicializar configuración de base de datos
+            logger.info("1️⃣ Inicializando base de datos...");
             DatabaseConfig dbConfig = DatabaseConfig.getInstance();
 
-            // 2. Ejecutar migraciones con Flyway
-            runMigrations(dbConfig);
+            // 2️⃣ Ejecutar migraciones con Flyway
+            logger.info("2️⃣ Ejecutando migraciones...");
+            FlywayConfiguration flywayConfig = new FlywayConfiguration(dbConfig);
+            flywayConfig.runMigrations();
 
-            // 3. Configurar Jackson para manejar LocalDateTime
-            ObjectMapper objectMapper = new ObjectMapper();
-            objectMapper.registerModule(new JavaTimeModule());
+            // 3️⃣ Crear aplicación Javalin
+            logger.info("3️⃣ Configurando servidor web...");
+            Javalin app = createJavalinApp(appConfig);
 
-            // 4. Crear aplicación Javalin
-            Javalin app = Javalin.create(config -> {
-                // JSON
-                config.jsonMapper(new JavalinJackson(objectMapper, true));
+            // 4️⃣ Configurar rutas
+            logger.info("4️⃣ Configurando rutas...");
+            Routes routes = new Routes(dbConfig);
+            routes.configureRoutes(app);
 
-                // CORS
-                config.bundledPlugins.enableCors(cors -> {
-                    cors.addRule(CorsPluginConfig.CorsRule::anyHost);
-                });
-
-                // Otras configuraciones útiles
-                config.showJavalinBanner = false;        // Sin banner al iniciar
-                config.useVirtualThreads = true;         // Java 21+ Virtual Threads
-                config.requestLogger.http((ctx, ms) -> {
-                    logger.info("{} {} - {}ms", ctx.method(), ctx.path(), ms);
-                });
-            });
-
-
-            // 7. Iniciar servidor
-            int port = Integer.parseInt(System.getenv().getOrDefault("SERVER_PORT", "8090"));
+            // 5️⃣ Iniciar servidor
+            logger.info("5️⃣ Iniciando servidor...");
+            int port = appConfig.getInt("server.port");
             app.start(port);
 
-            logger.info("✅ Aplicación iniciada en http://localhost:{}", port);
+            // 6️⃣ Mostrar información de la aplicación
+            Routes.logApplicationInfo(port);
+            appConfig.logConfiguration();
 
-
-            // 8. Graceful shutdown
-            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                logger.info("🛑 Cerrando aplicación...");
-                app.stop();
-                dbConfig.close();
-                logger.info("✅ Aplicación cerrada correctamente");
-            }));
+            // 7️⃣ Graceful shutdown
+            setupShutdownHook(app, dbConfig);
 
         } catch (Exception e) {
             logger.error("❌ Error fatal al iniciar la aplicación", e);
@@ -68,56 +59,87 @@ public class Main {
         }
     }
 
-    private static void runMigrations(DatabaseConfig dbConfig) {
-        logger.info("🔄 Ejecutando migraciones de base de datos...");
+    /**
+     * Crea y configura la aplicación Javalin usando AppConfiguration
+     */
+    private static Javalin createJavalinApp(AppConfiguration appConfig) {
+        logger.debug("🔧 Creando aplicación Javalin...");
 
-        try {
-            Flyway flyway = Flyway.configure()
-                    .dataSource(dbConfig.getDataSource())
-                    .locations("classpath:db/migration")
-                    .cleanDisabled(false) // Permitir clean para desarrollo
-                    .baselineOnMigrate(false) // ❌ DESACTIVAR baseline
-                    .validateOnMigrate(true)
-                    .load();
+        return Javalin.create(config -> {
+            // JSON Configuration
+            config.jsonMapper(JacksonConfiguration.createJavalinJackson());
 
-            // 🧹 LIMPIEZA COMPLETA (solo para desarrollo)
-            logger.info("🧹 Limpiando base de datos completamente...");
-            flyway.clean();
+            // CORS Configuration
+            config.bundledPlugins.enableCors(CorsConfiguration::configureCors);
 
-            // 📋 Verificar estado después de clean
-            var infoAfterClean = flyway.info();
-            logger.info("📋 Estado después de clean:");
-            for (var migration : infoAfterClean.all()) {
-                logger.info("  {} - {} ({})",
-                        migration.getVersion(),
-                        migration.getDescription(),
-                        migration.getState());
-            }
+            // Server Configuration
+            config.showJavalinBanner = false;
 
-            // 🚀 Ejecutar migraciones desde cero
-            logger.info("🚀 Ejecutando todas las migraciones desde la V1...");
-            var result = flyway.migrate();
-
-            // 📊 Estado final
-            var finalInfo = flyway.info();
-            logger.info("📋 Estado final de migraciones:");
-            for (var migration : finalInfo.all()) {
-                logger.info("  {} - {} ({})",
-                        migration.getVersion(),
-                        migration.getDescription(),
-                        migration.getState());
-            }
-
-            if (result.migrationsExecuted > 0) {
-                logger.info("✅ {} migraciones ejecutadas correctamente", result.migrationsExecuted);
+            // Virtual Threads (si está habilitado y disponible)
+            if (appConfig.getBoolean("server.virtual-threads") && isVirtualThreadsAvailable()) {
+                config.useVirtualThreads = true;
+                logger.info("🧵 Virtual Threads habilitados");
             } else {
-                logger.info("✅ Base de datos actualizada (no había migraciones pendientes)");
+                logger.info("🧵 Virtual Threads deshabilitados");
             }
 
-        } catch (Exception e) {
-            logger.error("❌ Error al ejecutar migraciones", e);
-            throw new RuntimeException("Fallo en migraciones de base de datos", e);
-        }
+            // Request Logging (si está habilitado)
+            if (appConfig.getBoolean("server.request-logging")) {
+                config.requestLogger.http((ctx, ms) -> {
+                    if (appConfig.getBoolean("logging.request-details", false)) {
+                        logger.info("{} {} - {}ms [{}]",
+                                ctx.method(), ctx.path(), ms,
+                                ctx.header("User-Agent", "Unknown"));
+                    } else {
+                        logger.info("{} {} - {}ms", ctx.method(), ctx.path(), ms);
+                    }
+                });
+            }
+
+            // Development Configuration
+            if (appConfig.isDevelopment()) {
+                config.bundledPlugins.enableDevLogging();
+                logger.debug("🔧 Configuración de desarrollo habilitada");
+            }
+        });
     }
 
+    /**
+     * Configura el graceful shutdown
+     */
+    private static void setupShutdownHook(Javalin app, DatabaseConfig dbConfig) {
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            logger.info("🛑 Iniciando cierre controlado de la aplicación...");
+
+            try {
+                // Detener servidor HTTP
+                logger.info("⏹️ Deteniendo servidor HTTP...");
+                app.stop();
+
+                // Cerrar conexiones de base de datos
+                logger.info("🔌 Cerrando conexiones de base de datos...");
+                dbConfig.close();
+
+                logger.info("✅ Aplicación cerrada correctamente");
+
+            } catch (Exception e) {
+                logger.error("❌ Error durante el cierre de la aplicación", e);
+            }
+        }));
+    }
+
+    /**
+     * Verifica si los virtual threads están disponibles (Java 21+)
+     */
+    private static boolean isVirtualThreadsAvailable() {
+        try {
+            String javaVersion = System.getProperty("java.version");
+            String[] parts = javaVersion.split("\\.");
+            int majorVersion = Integer.parseInt(parts[0]);
+            return majorVersion >= 21;
+        } catch (Exception e) {
+            logger.warn("⚠️ No se pudo determinar la versión de Java: {}", e.getMessage());
+            return false;
+        }
+    }
 }

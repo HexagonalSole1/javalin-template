@@ -10,4 +10,10 @@ public interface IUserRepository {
     ArrayList<User> findAllUsers() throws SQLException;
 
     User save(CreaterUserRequest user) throws SQLException;
+
+    User findById(Long id) throws SQLException;
+
+    boolean existsByEmail(String email) throws SQLException;
+
+    long countUsers() throws SQLException;
 }
