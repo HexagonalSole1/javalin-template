@@ -19,34 +19,11 @@ public class UserRoutes {
     public void configure(Javalin app) {
         logger.info("🛣️ Configurando rutas de usuarios...");
 
-        // 🏥 Health check
         app.get("/api/health", userController::healthCheck);
-
-        // 👥 Rutas de usuarios
         app.get("/api/users", userController::getAllUsers);           // GET - Obtener todos los usuarios
         app.post("/api/users", userController::createUser);           // POST - Crear usuario
         app.get("/api/users/{id}", userController::getUserById);      // GET - Obtener usuario por ID
 
-        // 📋 Ruta de bienvenida
-        app.get("/", ctx -> {
-            ctx.json(java.util.Map.of(
-                    "message", "🚀 API de Usuarios - Javalin + PostgreSQL",
-                    "version", "1.0.0",
-                    "endpoints", java.util.List.of(
-                            "GET /api/health - Health check",
-                            "GET /api/users - Obtener todos los usuarios",
-                            "POST /api/users - Crear nuevo usuario",
-                            "GET /api/users/{id} - Obtener usuario por ID"
-                    ),
-                    "example_request", java.util.Map.of(
-                            "url", "POST /api/users",
-                            "body", java.util.Map.of(
-                                    "name", "Juan Pérez",
-                                    "email", "juan@example.com"
-                            )
-                    )
-            ));
-        });
 
         logger.info("✅ Rutas de usuarios configuradas correctamente");
         logAvailableRoutes();
@@ -56,8 +33,7 @@ public class UserRoutes {
      * Log de todas las rutas disponibles para debugging
      */
     private void logAvailableRoutes() {
-        logger.info("📋 Rutas disponibles:");
-        logger.info("  GET    /                 - Página de bienvenida");
+        logger.info("📋 Rutas de usuarios disponibles:");
         logger.info("  GET    /api/health       - Health check");
         logger.info("  GET    /api/users        - Obtener todos los usuarios");
         logger.info("  POST   /api/users        - Crear nuevo usuario");
